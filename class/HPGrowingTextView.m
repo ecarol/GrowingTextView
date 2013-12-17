@@ -665,8 +665,10 @@
 	if(![textView hasText] && [atext isEqualToString:@""]) return NO;
 	
 	//Added by bretdabaker: sometimes we want to handle this ourselves
-    	if ([delegate respondsToSelector:@selector(growingTextView:shouldChangeTextInRange:replacementText:)])
-        	return [delegate growingTextView:self shouldChangeTextInRange:range replacementText:atext];
+    	if ([delegate respondsToSelector:@selector(growingTextView:shouldChangeTextInRange:replacementText:)]) {
+        	BOOL r = [delegate growingTextView:self shouldChangeTextInRange:range replacementText:atext];
+        	if (r) return YES;
+        }
 	
 	if ([atext isEqualToString:@"\n"]) {
 		if ([delegate respondsToSelector:@selector(growingTextViewShouldReturn:)]) {

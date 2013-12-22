@@ -263,20 +263,28 @@
 	if (newSizeH < minHeight || !internalTextView.hasText) {
         newSizeH = minHeight; //not smalles than minHeight
     }
-    else if (maxHeight && internalTextView.frame.size.height > maxHeight) {
+    else if (maxHeight && newSizeH > maxHeight) {
         newSizeH = maxHeight; // not taller than maxHeight
     }
     
 	if (internalTextView.frame.size.height != newSizeH)
 	{
-        // [fixed] Pasting too much text into the view failed to fire the height change, 
-        // thanks to Gwynne <http://blog.darkrainfall.org/>
-        
-        if (newSizeH > maxHeight && internalTextView.frame.size.height <= maxHeight)
+        // if our new height is greater than the maxHeight
+        // sets not set the height or move things
+        // around and enable scrolling
+        if (newSizeH >= maxHeight)
         {
-            newSizeH = maxHeight;
+            if(!internalTextView.scrollEnabled){
+                internalTextView.scrollEnabled = YES;
+                [internalTextView flashScrollIndicators];
+            }
+            
+        } else {
+            internalTextView.scrollEnabled = NO;
         }
         
+        // [fixed] Pasting too much text into the view failed to fire the height change,
+        // thanks to Gwynne <http://blog.darkrainfall.org/>
 		if (newSizeH <= maxHeight)
 		{
             if(animateHeightChange) {
@@ -315,29 +323,6 @@
                 }	
             }
 		}
-        
-        // if our new height is greater than the maxHeight
-        // sets not set the height or move things
-        // around and enable scrolling
-		if (newSizeH >= maxHeight)
-		{
-			if(!internalTextView.scrollEnabled){
-				internalTextView.scrollEnabled = YES;
-				[internalTextView flashScrollIndicators];
-			}
-			
-		} else {
-			internalTextView.scrollEnabled = NO;
-		}
-		
-        // scroll to caret (needed on iOS7)
-        if ([self respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
-        {
-            CGRect r = [internalTextView caretRectForPosition:internalTextView.selectedTextRange.end];
-            CGFloat caretY =  MAX(r.origin.y - internalTextView.frame.size.height + r.size.height + 8, 0);
-            if(internalTextView.contentOffset.y < caretY && r.origin.y != INFINITY)
-                internalTextView.contentOffset = CGPointMake(0, MIN(caretY, internalTextView.contentSize.height));
-        }
 	}
     // Display (or not) the placeholder string
     
@@ -348,57 +333,37 @@
         [internalTextView setNeedsDisplay];
     }
     
+    
+    // scroll to caret (needed on iOS7)
+    if ([self respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
+    {
+        [self performSelector:@selector(resetScrollPositionForIOS7) withObject:nil afterDelay:0.1f];
+    }
+    
     // Tell the delegate that the text view changed
-	
     if ([delegate respondsToSelector:@selector(growingTextViewDidChange:)]) {
 		[delegate growingTextViewDidChange:self];
 	}
-	
 }
 
 // Code from apple developer forum - @Steve Krulewitz, @Mark Marszal, @Eric Silverberg
 - (CGFloat)measureHeight
 {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 70000
     if ([self respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
     {
-        CGRect frame = internalTextView.bounds;
-        CGSize fudgeFactor;
-        // The padding added around the text on iOS6 and iOS7 is different.
-        fudgeFactor = CGSizeMake(10.0, 16.0);
-        
-        frame.size.height -= fudgeFactor.height;
-        frame.size.width -= fudgeFactor.width;
-        
-        NSMutableAttributedString* textToMeasure;
-        if(internalTextView.attributedText && internalTextView.attributedText.length > 0){
-            textToMeasure = [[NSMutableAttributedString alloc] initWithAttributedString:internalTextView.attributedText];
-        }
-        else{
-            textToMeasure = [[NSMutableAttributedString alloc] initWithString:internalTextView.text];
-            [textToMeasure addAttribute:NSFontAttributeName value:internalTextView.font range:NSMakeRange(0, textToMeasure.length)];
-        }
-        
-        if ([textToMeasure.string hasSuffix:@"\n"])
-        {
-            [textToMeasure appendAttributedString:[[NSAttributedString alloc] initWithString:@"-" attributes:@{NSFontAttributeName: internalTextView.font}]];
-        }
-        
-        // NSAttributedString class method: boundingRectWithSize:options:context is
-        // available only on ios7.0 sdk.
-        CGRect size = [textToMeasure boundingRectWithSize:CGSizeMake(CGRectGetWidth(frame), MAXFLOAT)
-                                                  options:NSStringDrawingUsesLineFragmentOrigin
-                                                  context:nil];
-        
-        return CGRectGetHeight(size) + fudgeFactor.height;
+        return ceilf([self.internalTextView sizeThatFits:self.internalTextView.frame.size].height);
     }
-    else
-    {
+    else {
         return self.internalTextView.contentSize.height;
     }
-#else
-    return self.internalTextView.contentSize.height;
-#endif
+}
+
+- (void)resetScrollPositionForIOS7
+{
+    CGRect r = [internalTextView caretRectForPosition:internalTextView.selectedTextRange.end];
+    CGFloat caretY =  MAX(r.origin.y - internalTextView.frame.size.height + r.size.height + 8, 0);
+    if (internalTextView.contentOffset.y < caretY && r.origin.y != INFINITY)
+        internalTextView.contentOffset = CGPointMake(0, caretY);
 }
 
 -(void)resizeTextView:(NSInteger)newSizeH
@@ -413,13 +378,18 @@
     
     internalTextViewFrame.origin.y = contentInset.top - contentInset.bottom;
     internalTextViewFrame.origin.x = contentInset.left;
-    internalTextViewFrame.size.width = internalTextView.contentSize.width;
     
     if(!CGRectEqualToRect(internalTextView.frame, internalTextViewFrame)) internalTextView.frame = internalTextViewFrame;
 }
 
 - (void)growDidStop
 {
+    // scroll to caret (needed on iOS7)
+    if ([self respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
+    {
+        [self resetScrollPositionForIOS7];
+    }
+    
 	if ([delegate respondsToSelector:@selector(growingTextView:didChangeHeight:)]) {
 		[delegate growingTextView:self didChangeHeight:self.frame.size.height];
 	}
@@ -660,29 +630,29 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (BOOL)textView:(UITextView *)textView shouldChangeTextInRange:(NSRange)range
  replacementText:(NSString *)atext {
-	
-	//weird 1 pixel bug when clicking backspace when textView is empty
-	if(![textView hasText] && [atext isEqualToString:@""]) return NO;
-	
-	//Added by bretdabaker: sometimes we want to handle this ourselves
-    	if ([delegate respondsToSelector:@selector(growingTextView:shouldChangeTextInRange:replacementText:)]) {
-        	BOOL r = [delegate growingTextView:self shouldChangeTextInRange:range replacementText:atext];
-        	if (r) return YES;
+        
+        //weird 1 pixel bug when clicking backspace when textView is empty
+        if(![textView hasText] && [atext isEqualToString:@""]) return NO;
+        
+        //Added by bretdabaker: sometimes we want to handle this ourselves
+            if ([delegate respondsToSelector:@selector(growingTextView:shouldChangeTextInRange:replacementText:)]) {
+                BOOL r = [delegate growingTextView:self shouldChangeTextInRange:range replacementText:atext];
+                if (r) return YES;
         }
-	
-	if ([atext isEqualToString:@"\n"]) {
-		if ([delegate respondsToSelector:@selector(growingTextViewShouldReturn:)]) {
-			if (![delegate performSelector:@selector(growingTextViewShouldReturn:) withObject:self]) {
-				return YES;
-			} else {
-				[textView resignFirstResponder];
-				return NO;
-			}
-		}
-	}
-	
-	return YES;
-	
+        
+        if ([atext isEqualToString:@"\n"]) {
+                if ([delegate respondsToSelector:@selector(growingTextViewShouldReturn:)]) {
+                        if (![delegate performSelector:@selector(growingTextViewShouldReturn:) withObject:self]) {
+                                return YES;
+                        } else {
+                                [textView resignFirstResponder];
+                                return NO;
+                        }
+                }
+        }
+        
+        return YES;
+        
     
 }
 

@@ -113,7 +113,7 @@
 -(void)setPlaceholder:(NSString *)placeholder
 {
 	_placeholder = placeholder;
-	//[self setNeedsDisplay];
+	[self setNeedsDisplay];
 }
 
 @end

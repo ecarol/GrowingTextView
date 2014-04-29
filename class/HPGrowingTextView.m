@@ -333,7 +333,6 @@
         [internalTextView setNeedsDisplay];
     }
     
-    
     // scroll to caret (needed on iOS7)
     if ([self respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
     {
@@ -390,9 +389,9 @@
         [self resetScrollPositionForIOS7];
     }
     
-	if ([delegate respondsToSelector:@selector(growingTextView:didChangeHeight:)]) {
-		[delegate growingTextView:self didChangeHeight:self.frame.size.height];
-	}
+    if ([delegate respondsToSelector:@selector(growingTextView:didChangeHeight:)]) {
+        [delegate growingTextView:self didChangeHeight:self.frame.size.height];
+    }
 }
 
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
